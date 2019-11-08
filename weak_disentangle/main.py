@@ -28,6 +28,11 @@ from absl import flags
 from tensorflow import gfile
 from tqdm import tqdm
 
+# Some hax to enable the code to run
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+# End of hax
+
 from weak_disentangle import datasets, viz, networks, evaluate
 from weak_disentangle import utils as ut
 tf.enable_v2_behavior()
