@@ -1,3 +1,0 @@
-[submodule "weak_disentangle/disentanglement_lib"]
-	path = weak_disentangle/disentanglement_lib
-	url = https://github.com/google-research/disentanglement_lib.git
