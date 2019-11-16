@@ -9,6 +9,14 @@ To run this code with a choice of default config (for complete-change-pairing on
 python3 -m weak_disentangle.main
 ```
 
+### Getting Started
+
+1. Clone this repository. 
+2. Pip install all dependencies. 
+3. Go to https://github.com/google-research/disentanglement_lib and follow the instructions to download datasets.
+4. Move all relevant datasets to the root directory. 
+5. Look at `examples/example_load_data.py` for how to load data. 
+
 ### Changing the Configuration
 
 The codebase uses gin-config to specify the model being run. A full default specification is provided in `weak_disentangle/configs/gan.gin`. Below, we explain the behavior of the important configuration parameters:
