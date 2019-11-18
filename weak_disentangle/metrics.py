@@ -35,11 +35,9 @@ def s_decoder(y_real_pad, gen, enc, masks, k):
         joint distr (z^), mariginal distr of z^_I, marginal distr of z^_\I
     """
 
-    # assume we're following label code
-
-    # some variables
-    batch_size = 10
-    z_dim = 10
+    # taken from config
+    batch_size = train.batch_size
+    z_dim = train.s_dim
 
     # y_real_pad = y_real # do we need to do padding
     y_real_pad = tf.tile(y_real_pad, k)
@@ -51,9 +49,6 @@ def s_decoder(y_real_pad, gen, enc, masks, k):
     x_fake = tf.stop_gradient(gen(z_fake))
 
     p_z = enc(x_fake) # distribs: (z_dim, batch * k)
-    
-    # _, _, masks_idx = z_fake
-    # selected_mask = tf.gather(masks, masks_idx) # (z_dim, batch * k)
 
     p_z_I = marginalize(p_z, masks)
     p_z_not_I = marginalize(p_z, masks)
@@ -77,6 +72,7 @@ def s_decoder(y_real_pad, gen, enc, masks, k):
 
     return joint, marg_I, marg_not_I # each are distribs of shape (z_dim, batch)
 
+@gin.configurable
 def mi_estimate(y_real, gen, enc, masks, k):
     """Estimates the MI of the encoder.
 
@@ -91,17 +87,17 @@ def mi_estimate(y_real, gen, enc, masks, k):
         the averaged MI
     """
 
-    # some variables
-    batch_size = 10
-    z_dim = 10
-    s_dim = None
+    # taken from config
+    batch_size = train.batch_size
+    z_dim = train.s_dim
+    s_dim = train.s_dim
     
     y_real_pad = y_real # do we need to do padding
 
     # decode the s_I's
     joint, marg_I, marg_not_I = s_decoder(y_real_pad, gen, enc, masks, k)
 
-    # generate z's # NOTE: I think we have to use the fixed masks here
+    # generate z's
     z_fake = datasets.paired_randn(batch_size, z_dim, masks)
     z_fake = z_fake + y_real_pad
     # x_fake = tf.stop_gradient(gen(z_fake))
