@@ -73,8 +73,8 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
     assert factors.split("=")[0] in {"l"}
     dis = networks.LabelDiscriminator(x_shape, s_dim)  # Uses s_dim
     gen = networks.Generator(x_shape, z_dim)
-    enc = networks.Encoder(x_shape, s_dim)  # Encoder ignores nuisance param
-    trans_enc = networks.Encoder(x_shape, s_dim)
+    enc = networks.CovEncoder(x_shape, s_dim)  # Encoder ignores nuisance param
+    trans_enc = networks.CovEncoder(x_shape, s_dim)
     ut.log(dis.read(dis.WITH_VARS))
     ut.log(gen.read(gen.WITH_VARS))
     ut.log(enc.read(enc.WITH_VARS))
@@ -209,6 +209,12 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
     return enc(x).mean()
   enc_np = lambda x: enc_eval(x).numpy()
 
+  @tf.function
+  def trans_enc_eval(x):
+    trans_enc.eval()
+    return trans_enc(x).mean()
+  trans_enc_np = lambda x: trans_enc_eval(x).numpy()
+
   # Initial preparation
   if FLAGS.debug:
     iter_log = 100
@@ -301,23 +307,38 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
       y_real = y_real * masks
       mi = metrics.mi_estimate(y_real, gen, enc, masks, 50, num_s_I, z_dim, s_dim)
       mi_trans = metrics.mi_estimate(y_real, gen, trans_enc, masks, 50, num_s_I, z_dim, s_dim, z_trans)
-      print(mi)
-      print(mi_trans)
+      ut.log("Encoder MI: {} Transformed Encoder MI: {}".format(mi, mi_trans))
 
       if FLAGS.debug:
+        ut.log("Encoder Metrics")
         evaluate.evaluate_enc(enc_np, dset, s_dim,
                               FLAGS.gin_file,
                               FLAGS.gin_bindings,
                               pida_sample_size=1000,
                               dlib_metrics=FLAGS.debug_dlib_metrics)
+        ut.log("Transformed Encoder Metrics")
+        evaluate.evaluate_enc(trans_enc_np, dset, s_dim,
+                              FLAGS.gin_file,
+                              FLAGS.gin_bindings,
+                              pida_sample_size=1000,
+                              dlib_metrics=FLAGS.debug_dlib_metrics)
+
 
       else:
         dlib_metrics = (global_step + 1) % iter_metric == 0
+        ut.log("Encoder Metrics")
         evaluate.evaluate_enc(enc_np, dset, s_dim,
                               FLAGS.gin_file,
                               FLAGS.gin_bindings,
                               pida_sample_size=10000,
                               dlib_metrics=dlib_metrics)
+        ut.log("Transformed Encoder Metrics")
+        evaluate.evaluate_enc(trans_enc_np, dset, s_dim,
+                              FLAGS.gin_file,
+                              FLAGS.gin_bindings,
+                              pida_sample_size=10000,
+                              dlib_metrics=dlib_metrics)
+
 
 
     # Save model

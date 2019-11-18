@@ -117,6 +117,4 @@ def mi_estimate(y_real, gen, enc, masks, k, batch_size, z_dim, s_dim,
     log_prob_joint = joint.log_prob(z_fake[:, :s_dim])
     log_prob_prod =  marg_I.log_prob(z_I_fake[:, :s_dim]) + marg_not_I.log_prob(z_not_I_fake[:, :s_dim])
 
-    print(log_prob_joint)
-    print(log_prob_prod)
     return tf.reduce_mean(log_prob_joint - log_prob_prod)

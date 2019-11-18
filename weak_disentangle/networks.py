@@ -49,7 +49,7 @@ class CovEncoder(ts.Module):
         conv(64 * width, 4, 2, "same"), ts.LeakyReLU(),
         ts.Flatten(),
         dense(128 * width), ts.LeakyReLU(),
-        dense(z_dim + z_dim ** 2)
+        dense(z_dim + z_dim * (z_dim + 1) // 2)
         )
 
     if spectral_norm:
@@ -62,10 +62,10 @@ class CovEncoder(ts.Module):
   def forward(self, x):
     h = self.net(x)
     a = h[:, :self.z_dim]
-    b = tf.reshape(h[:, self.z_dim:], [-1, self.z_dim, self.z_dim])
+    scale = tf.contrib.distributions.fill_triangular(h[:, self.z_dim:])
     return tfd.MultivariateNormalLinearOperator(
         loc=a,
-        scale=tf.linalg.LinearOperatorFullMatrix(b))
+        scale=tf.linalg.LinearOperatorLowerTriangular(scale))
 
 
 @gin.configurable
