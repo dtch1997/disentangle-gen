@@ -51,7 +51,7 @@ def s_decoder(y_real_pad, gen, enc, masks, k):
     p_z = enc(x_fake) # distribs: (z_dim, batch * k)
 
     p_z_I = marginalize(p_z, masks)
-    p_z_not_I = marginalize(p_z, masks)
+    p_z_not_I = marginalize(p_z, 1-masks)
 
     p_z_split = tf.split(axis=-1, value=p_z, num_split=k) # [distr: (z_dim, batch), k of them]
     p_z_split_I = tf.split(axis=-1, value=p_z_I, num_split=k)
