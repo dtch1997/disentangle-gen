@@ -218,7 +218,7 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
   # Initial preparation
   if FLAGS.debug:
     iter_log = 100
-    iter_save = 1
+    iter_save = 2000
     train_range = range(iterations)
     basedir = FLAGS.basedir
     vizdir = FLAGS.basedir
@@ -226,7 +226,7 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
     new_run = True
   else:
     iter_log = 5000
-    iter_save = 1
+    iter_save = 5000
     iter_metric = iter_save * 5  # Make sure this is a factor of 500k
     basedir = os.path.join(FLAGS.basedir, "exp")
     ckptdir = os.path.join(basedir, "ckptdir")

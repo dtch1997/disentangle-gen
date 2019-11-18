@@ -4,7 +4,7 @@ import numpy as np
 import gin
 from functools import partial
 import functools
-# from weak_disentangle import datasets, viz, networks, evaluate
+from weak_disentangle import datasets, viz, networks, evaluate
 
 tfd = tfp.distributions
 
@@ -18,7 +18,7 @@ def mask_reduction(x, masks):
         step1 = tf.boolean_mask(x, boolean_mask, axis=1)
         step2 = tf.boolean_mask(step1, boolean_mask, axis=2)
         return step2
-    
+
 
 def marginalize(p, masks):
     if p.__class__.__name__ == "MultivariateNormalDiag":
@@ -28,7 +28,7 @@ def marginalize(p, masks):
     else:
         return tfd.MultivariateNormalFullCovariance(loc=mask_reduction(p.mean(), masks),
                                                     covariance_matrix=mask_reduction(p.covariance(), masks))
-        
+
 
 @gin.configurable
 def s_decoder(y_real_pad, gen, enc, masks, k, batch_size, z_dim):
