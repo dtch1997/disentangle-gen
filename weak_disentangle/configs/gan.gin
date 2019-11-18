@@ -38,4 +38,4 @@ weight_normalization.add.epsilon = 1e-3
 weight_normalization.add.scale = False
 batch_normalization.add.use_out_hook = True
 
-log.debug = False
+log.debug = True
