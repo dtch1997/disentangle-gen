@@ -17,12 +17,15 @@
 """Main script for all experiments.
 """
 
+
+
 import gin
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import tensorflow as tf
 import time
+import numpy as np
 from absl import app
 from absl import flags
 from tensorflow import gfile
@@ -30,18 +33,21 @@ from tqdm import tqdm
 
 from weak_disentangle import datasets, viz, networks, evaluate
 from weak_disentangle import utils as ut
+from weak_disentangle import metrics
+
 tf.enable_v2_behavior()
 tfk = tf.keras
 
 
 @gin.configurable
-def train(dset_name, s_dim, n_dim, factors,
+def train(dset_name, s_dim, n_dim, factors, z_transform,
           batch_size, dec_lr, enc_lr_mul, iterations,
           model_type="gen"):
   ut.log("In train")
   masks = datasets.make_masks(factors, s_dim)
   z_dim = s_dim + n_dim
   enc_lr = enc_lr_mul * dec_lr
+  z_trans = datasets.get_z_transform(z_transform)
 
   # Load data
   dset = datasets.get_dlib_data(dset_name)
@@ -68,6 +74,7 @@ def train(dset_name, s_dim, n_dim, factors,
     dis = networks.LabelDiscriminator(x_shape, s_dim)  # Uses s_dim
     gen = networks.Generator(x_shape, z_dim)
     enc = networks.Encoder(x_shape, s_dim)  # Encoder ignores nuisance param
+    trans_enc = networks.Encoder(x_shape, s_dim)
     ut.log(dis.read(dis.WITH_VARS))
     ut.log(gen.read(gen.WITH_VARS))
     ut.log(enc.read(enc.WITH_VARS))
@@ -77,6 +84,7 @@ def train(dset_name, s_dim, n_dim, factors,
     gen_opt = tfk.optimizers.Adam(learning_rate=dec_lr, beta_1=0.5, beta_2=0.999, epsilon=1e-8)
     dis_opt = tfk.optimizers.Adam(learning_rate=enc_lr, beta_1=0.5, beta_2=0.999, epsilon=1e-8)
     enc_opt = tfk.optimizers.Adam(learning_rate=enc_lr, beta_1=0.5, beta_2=0.999, epsilon=1e-8)
+    trans_enc_opt = tfk.optimizers.Adam(learning_rate=enc_lr, beta_1=0.5, beta_2=0.999, epsilon=1e-8)
 
   @tf.function
   def train_gen_step(x1_real, x2_real, y_real):
@@ -132,6 +140,7 @@ def train(dset_name, s_dim, n_dim, factors,
     gen.train()
     dis.train()
     enc.train()
+    trans_enc.train()
 
     if n_dim > 0:
       padding = tf.zeros((y_real.shape[0], n_dim))
@@ -160,6 +169,7 @@ def train(dset_name, s_dim, n_dim, factors,
       z_fake = datasets.paired_randn(batch_size, z_dim, masks)
       z_fake = z_fake + y_real_pad
       x_fake = tf.stop_gradient(gen(z_fake))
+      trans_z_fake = z_trans(z_fake)
 
       # Discriminate
       x = tf.concat((x_real, x_fake), 0)
@@ -168,19 +178,25 @@ def train(dset_name, s_dim, n_dim, factors,
 
       # Encode
       p_z = enc(x_fake)
+      p_z_trans = trans_enc(x_fake)
 
       dis_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
           logits=logits, labels=targets))
       # Encoder ignores nuisance parameters (if they exist)
       enc_loss = -tf.reduce_mean(p_z.log_prob(z_fake[:, :s_dim]))
+      trans_enc_loss = -tf.reduce_mean(p_z_trans.log_prob(
+        trans_z_fake[:, :s_dim]))
 
     dis_grads = tape.gradient(dis_loss, dis.trainable_variables)
     enc_grads = tape.gradient(enc_loss, enc.trainable_variables)
+    trans_enc_grads = tape.gradient(trans_enc_loss,
+      trans_enc.trainable_variables)
 
     dis_opt.apply_gradients(zip(dis_grads, dis.trainable_variables))
     enc_opt.apply_gradients(zip(enc_grads, enc.trainable_variables))
+    trans_enc_opt.apply_gradients(zip(trans_enc_grads, trans_enc.trainable_variables))
 
-    return dict(gen_loss=gen_loss, dis_loss=dis_loss, enc_loss=enc_loss)
+    return dict(gen_loss=gen_loss, dis_loss=dis_loss, enc_loss=enc_loss, trans_enc_loss=trans_enc_loss)
 
   @tf.function
   def gen_eval(z):
@@ -196,7 +212,7 @@ def train(dset_name, s_dim, n_dim, factors,
   # Initial preparation
   if FLAGS.debug:
     iter_log = 100
-    iter_save = 2000
+    iter_save = 1
     train_range = range(iterations)
     basedir = FLAGS.basedir
     vizdir = FLAGS.basedir
@@ -204,7 +220,7 @@ def train(dset_name, s_dim, n_dim, factors,
     new_run = True
   else:
     iter_log = 5000
-    iter_save = 50000
+    iter_save = 1
     iter_metric = iter_save * 5  # Make sure this is a factor of 500k
     basedir = os.path.join(FLAGS.basedir, "exp")
     ckptdir = os.path.join(basedir, "ckptdir")
@@ -217,7 +233,8 @@ def train(dset_name, s_dim, n_dim, factors,
   if model_type in {"gen", "van"}:
     ckpt_root = tf.train.Checkpoint(dis=dis, dis_opt=dis_opt,
                                     gen=gen, gen_opt=gen_opt,
-                                    enc=enc, enc_opt=enc_opt)
+                                    enc=enc, enc_opt=enc_opt,
+                                    trans_enc=trans_enc, trans_enc_opt=trans_enc_opt)
 
   # Check if we're resuming training if not in debugging mode
   if not FLAGS.debug:
@@ -264,7 +281,8 @@ def train(dset_name, s_dim, n_dim, factors,
       string = ", ".join((
           "Iter: {:07d}, Elapsed: {:.3e}, (Elapsed) Iter/s: {:.3e}, (Train Step) Iter/s: {:.3e}".format(
               global_step, elapsed_time, global_step / elapsed_time, global_step / train_time),
-          "Gen: {gen_loss:.4f}, Dis: {dis_loss:.4f}, Enc: {enc_loss:.4f}".format(**vals)
+          "Gen: {gen_loss:.4f}, Dis: {dis_loss:.4f}, Enc: {enc_loss:.4f}, Trans_Enc: {trans_enc_loss:.4f}".format(
+          **vals)
       )) + "."
       ut.log(string)
 
@@ -274,6 +292,17 @@ def train(dset_name, s_dim, n_dim, factors,
         viz.ablation_visualization(x1, x2, gen_eval, z_dim, vizdir, global_step + 1)
       elif model_type == "van":
         viz.ablation_visualization(x, x, gen_eval, z_dim, vizdir, global_step + 1)
+
+      num_s_I = 20
+      y_real = tf.convert_to_tensor(dset.sample_factors(num_s_I, np.random.RandomState(1)), dtype=tf.float32)
+      masks = np.zeros(y_real.shape)
+      masks[:, 0] = 1
+      masks = tf.convert_to_tensor(masks, dtype=tf.float32)
+      y_real = y_real * masks
+      mi = metrics.mi_estimate(y_real, gen, enc, masks, 50, num_s_I, z_dim, s_dim)
+      mi_trans = metrics.mi_estimate(y_real, gen, trans_enc, masks, 50, num_s_I, z_dim, s_dim, z_trans)
+      print(mi)
+      print(mi_trans)
 
       if FLAGS.debug:
         evaluate.evaluate_enc(enc_np, dset, s_dim,
@@ -289,6 +318,7 @@ def train(dset_name, s_dim, n_dim, factors,
                               FLAGS.gin_bindings,
                               pida_sample_size=10000,
                               dlib_metrics=dlib_metrics)
+
 
     # Save model
     if (global_step + 1) % iter_save == 0 or (global_step == 0 and new_run):

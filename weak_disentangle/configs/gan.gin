@@ -1,9 +1,10 @@
-train.model_type = "gen"
+train.model_type = "van"
 train.dset_name = "dsprites"
 train.s_dim = 5
 train.n_dim = 0
-train.factors = "c=0,1,2,3,4"
-mask_type = "match"
+train.factors = "l=0"
+train.z_transform = "sigmoid"
+mask_type = "label"
 train.batch_size = 64
 train.dec_lr = 1e-3
 train.enc_lr_mul = 1

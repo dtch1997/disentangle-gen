@@ -248,3 +248,29 @@ def label_randn(batch_size, z_dim, masks):
     n = tf.random.normal((batch_size, n_dim))
     z = tf.concat((z, n), axis=-1)
     return z
+
+
+def get_z_transform(z_transform):
+  if z_transform == "sigmoid":
+    return tf.math.sigmoid
+  elif z_transform == "tanh":
+    return tf.math.tanh
+  elif z_transform.startswith("mix"):
+    [_, i, j] = z_transform.split("-")
+    i, j = int(i), int(j)
+    def _transform(tensor):
+      tensor[:, i] = tensor[:, j] = (tensor[:, i] + tensor[:, j]) / 2
+      return tensor
+    return _transform
+  elif z_transform.startswith("swap"):
+    [_, i, j] = z_transform.split("-")
+    i, j = int(i), int(j)
+    def _transform(tensor):
+      tensor[:, i], tensor[:, j] = tensor[:, j], tensor[:, i]
+      return tensor
+    return _transform
+  else:
+    # Identity transformation
+    def _transform(tensor):
+      return tensor
+    return _transform

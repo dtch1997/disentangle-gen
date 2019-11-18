@@ -33,6 +33,40 @@ deconv = gin.external_configurable(ts.ConvTranspose2d)
 add_wn = gin.external_configurable(ts.WeightNorm.add)
 add_bn = gin.external_configurable(ts.BatchNorm.add)
 
+@gin.configurable
+class CovEncoder(ts.Module):
+  '''
+  Warning: current implementation is greatly inefficient. Only use as a last
+  resort.
+  '''
+  def __init__(self, x_shape, z_dim, width=1, spectral_norm=True):
+    super().__init__()
+    self.z_dim = z_dim
+    self.net = ts.Sequential(
+        conv(32 * width, 4, 2, "same"), ts.LeakyReLU(),
+        conv(32 * width, 4, 2, "same"), ts.LeakyReLU(),
+        conv(64 * width, 4, 2, "same"), ts.LeakyReLU(),
+        conv(64 * width, 4, 2, "same"), ts.LeakyReLU(),
+        ts.Flatten(),
+        dense(128 * width), ts.LeakyReLU(),
+        dense(z_dim + z_dim ** 2)
+        )
+
+    if spectral_norm:
+      self.net.apply(ts.SpectralNorm.add, targets=ts.Affine)
+
+    ut.log("Building encoder...")
+    self.build([1] + x_shape)
+    self.apply(ut.reset_parameters)
+
+  def forward(self, x):
+    h = self.net(x)
+    a = h[:, :self.z_dim]
+    b = tf.reshape(h[:, self.z_dim:], [-1, self.z_dim, self.z_dim])
+    return tfd.MultivariateNormalLinearOperator(
+        loc=a,
+        scale=tf.linalg.LinearOperatorFullMatrix(b))
+
 
 @gin.configurable
 class Encoder(ts.Module):
