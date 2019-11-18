@@ -4,19 +4,31 @@ import numpy as np
 import gin
 from functools import partial
 import functools
-from weak_disentangle import datasets, viz, networks, evaluate
+# from weak_disentangle import datasets, viz, networks, evaluate
 
 tfd = tfp.distributions
 
 def mask_reduction(x, masks):
     # assume all masks are the same.
-    boolean_mask = tf.greater(masks[0, :], 0)
-    return tf.boolean_mask(x, boolean_mask, axis=1)
+    if len(x.shape) == 2:
+        boolean_mask = tf.greater(masks[0, :], 0)
+        return tf.boolean_mask(x, boolean_mask, axis=1)
+    if len(x.shape) == 3:
+        boolean_mask = tf.greater(masks[0, :], 0)
+        step1 = tf.boolean_mask(x, boolean_mask, axis=1)
+        step2 = tf.boolean_mask(step1, boolean_mask, axis=2)
+        return step2
+    
 
 def marginalize(p, masks):
-    return tfd.MultivariateNormalDiag(loc = mask_reduction(p.mean(), masks),
-                                      scale_diag=mask_reduction(p.stddev(), masks)
-    )
+    if p.__class__.__name__ == "MultivariateNormalDiag":
+        return tfd.MultivariateNormalDiag(loc = mask_reduction(p.mean(), masks),
+                                        scale_diag=mask_reduction(p.stddev(), masks)
+        )
+    else:
+        return tfd.MultivariateNormalFullCovariance(loc=mask_reduction(p.mean(), masks),
+                                                    covariance_matrix=mask_reduction(p.covariance(), masks))
+        
 
 @gin.configurable
 def s_decoder(y_real_pad, gen, enc, masks, k, batch_size, z_dim):
@@ -118,3 +130,17 @@ def mi_estimate(y_real, gen, enc, masks, k, batch_size, z_dim, s_dim,
     log_prob_prod =  marg_I.log_prob(z_I_fake[:, :s_dim]) + marg_not_I.log_prob(z_not_I_fake[:, :s_dim])
 
     return tf.reduce_mean(log_prob_joint - log_prob_prod)
+
+
+## tests
+# cov = [[1.0, 0.0, 0.0], [0.0, 4.0, 0.0], [0.0, 0.0, 9.0]]
+
+# test_dist = tfd.MultivariateNormalFullCovariance(
+#     loc = tf.expand_dims(tf.convert_to_tensor([0.0,0.0,0.0]),axis = 0),
+#     covariance_matrix=tf.expand_dims(tf.convert_to_tensor(cov), axis = 0)
+# )
+# masks = tf.expand_dims(tf.convert_to_tensor([1,0,1]),axis=0)
+# print(test_dist.mean().shape)
+# print(test_dist.batch_shape)
+# print(masks.shape)
+# print(marginalize(test_dist, masks).covariance())
