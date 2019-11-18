@@ -299,14 +299,15 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
       elif model_type == "van":
         viz.ablation_visualization(x, x, gen_eval, z_dim, vizdir, global_step + 1)
 
-      num_s_I = 20
+      num_s_I = 100
+      k = 150
       y_real = tf.convert_to_tensor(dset.sample_factors(num_s_I, np.random.RandomState(1)), dtype=tf.float32)
       masks = np.zeros(y_real.shape)
       masks[:, 0] = 1
       masks = tf.convert_to_tensor(masks, dtype=tf.float32)
       y_real = y_real * masks
-      mi = metrics.mi_estimate(y_real, gen, enc, masks, 50, num_s_I, z_dim, s_dim)
-      mi_trans = metrics.mi_estimate(y_real, gen, trans_enc, masks, 50, num_s_I, z_dim, s_dim, z_trans)
+      mi = metrics.mi_estimate(y_real, gen, enc, masks, k, num_s_I, z_dim, s_dim)
+      mi_trans = metrics.mi_estimate(y_real, gen, trans_enc, masks, k, num_s_I, z_dim, s_dim, z_trans)
       ut.log("Encoder MI: {} Transformed Encoder MI: {}".format(mi, mi_trans))
 
       if FLAGS.debug:
