@@ -366,7 +366,7 @@ if __name__ == "__main__":
   FLAGS = flags.FLAGS
   flags.DEFINE_string(
       "basedir",
-      "/tmp",
+      "savedir/default",
       "Path to directory where to store results.")
   flags.DEFINE_boolean(
       "debug",
