@@ -8,6 +8,7 @@ Created on Tue Nov 26 20:33:45 2019
 class AbstractGenerator:
     """
     A thin wrapper over a generic generator. 
+    Subclass this and implement the methods to interface with DisentanglementMetric
     """
 
     def __init__(self):
@@ -22,6 +23,8 @@ class AbstractGenerator:
         
     def sample_ZI(self, batch_size: int):
         """
+        Samples from the prior of ZI
+        
         Args: 
             - batch_size
             
@@ -34,6 +37,8 @@ class AbstractGenerator:
         
     def sample_ZnotI(self):
         """
+        Samples from the prior of ZnotI
+        
         Args: 
             - batch_size
             

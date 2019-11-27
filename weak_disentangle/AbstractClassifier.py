@@ -6,6 +6,10 @@ Created on Tue Nov 26 20:52:15 2019
 """
 
 class AbstractClassifier:
+    """
+    A thin wrapper over a generic classifier. 
+    Subclass this and implement the methods to interface with DisentanglementMetric
+    """
     
     def __init__(self):
         raise NotImplementedError
