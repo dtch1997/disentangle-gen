@@ -28,17 +28,18 @@ def parallel_encode_into_s(z_I, gen, clas, masks, k=100, lock_samples=True, z_no
 
     z_I_extended = tf.tile(z_I, [k, 1])
     masks_extended = tf.tile(masks, [k, 1])
+    z_notI_extended = None
 
     if z_notI == None:
         if lock_samples:
             z_notI = datasets.label_randn(batch_size, z_dim, masks)
-            z_notI = tf.tile(z_notI, [k, 1])
         else:
-            z_notI = datasets.label_randn(batch_size * k, z_dim, masks_extended)
-    else:
-        z_notI = tf.tile(z_notI, [k, 1])
+            z_notI_extended = datasets.label_randn(batch_size * k, z_dim, masks_extended)
+    
+    if z_notI_extended == None:
+        z_notI_extended = tf.tile(z_notI, [k, 1])
 
-    z = z_I_extended + z_notI
+    z = z_I_extended + z_notI_extended
 
     x_hat = tf.stop_gradient(gen(z))
 
@@ -49,12 +50,12 @@ def parallel_encode_into_s(z_I, gen, clas, masks, k=100, lock_samples=True, z_no
     p_s_split = [tfd.MultivariateNormalDiag(loc = m, scale_diag = s) for m, s in zip(tf.split(means, k), tf.split(stds, k))]
     cat = tfd.Categorical(probs=tf.ones((batch_size, k)) / k)
 
-    z_dist = tfd.Mixture(
+    s_dist = tfd.Mixture(
         cat=cat,
         components=p_s_split
     ) # distr.shape = (batch_size, z_dim)
 
-    return z_dist, z_notI
+    return s_dist, z_notI
 
 def p_s(s_I, z_dim, gen, clas, masks, k=100, z_notI = None):
     """
