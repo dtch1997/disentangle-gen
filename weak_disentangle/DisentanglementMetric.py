@@ -38,7 +38,7 @@ class DisentanglementMetric(tfk.Model):
         
         I_SI_ZI = tf.math.reduce_sum(tf.math.log(tf.math.divide(p_SI_given_ZI, p_SI)))
         I_SI_ZnotI = tf.math.reduce_sum(tf.math.log(tf.math.divide(p_SI_given_ZnotI, p_SI)))
-        
+        return I_SI_ZnotI - I_SI_ZI
         
             
             
