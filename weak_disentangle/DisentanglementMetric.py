@@ -28,11 +28,17 @@ class DisentanglementMetric(tfk.Model):
         batch_size = SI.shape[0]
         ZnotI_sample, log_pZnotI = self.generator.sample_ZnotI(batch_size)
         X_given_ZI_samples = self.generator.generate(ZI, ZnotI_sample)
-        p(SI_given_ZI) = self.classifier.log_prob(X_given_ZI_samples, SI)
-        
+        p_SI_given_ZI = self.classifier.log_prob(X_given_ZI_samples, SI)
+            # Tensor(batch_size)
         ZI_sample, log_pZI = self.generator.sample_ZI(batch_size)
         X_given_ZnotI_samples = self.generator.generate(ZI, ZnotI_sample)
-        p(SI_given_ZnotI) = self.classifier.log_prob(X_given_ZnotI_samples, SI)
+        p_SI_given_ZnotI = self.classifier.log_prob(X_given_ZnotI_samples, SI)
+            # Tensor(batch_size)
+        p_SI = None # TODO
+        
+        I_SI_ZI = tf.math.reduce_sum(tf.math.log(tf.math.divide(p_SI_given_ZI, p_SI)))
+        I_SI_ZnotI = tf.math.reduce_sum(tf.math.log(tf.math.divide(p_SI_given_ZnotI, p_SI)))
+        
         
             
             
