@@ -34,6 +34,40 @@ add_wn = gin.external_configurable(ts.WeightNorm.add)
 add_bn = gin.external_configurable(ts.BatchNorm.add)
 
 @gin.configurable
+class Classifier(ts.Module):
+  '''
+  Warning: current implementation is greatly inefficient. Only use as a last
+  resort.
+  '''
+  def __init__(self, x_shape, s_I_dim, width=1, spectral_norm=True):
+    super().__init__()
+    self.s_I_dim = s_I_dim
+    self.net = ts.Sequential(
+        conv(32 * width, 4, 2, "same"), ts.LeakyReLU(),
+        conv(32 * width, 4, 2, "same"), ts.LeakyReLU(),
+        conv(64 * width, 4, 2, "same"), ts.LeakyReLU(),
+        conv(64 * width, 4, 2, "same"), ts.LeakyReLU(),
+        ts.Flatten(),
+        dense(128 * width), ts.LeakyReLU(),
+        dense(2 * s_I_dim)
+        )
+
+    if spectral_norm:
+      self.net.apply(ts.SpectralNorm.add, targets=ts.Affine)
+
+    ut.log("Building encoder...")
+    self.build([1] + x_shape)
+    self.apply(ut.reset_parameters)
+
+  def forward(self, x):
+    h = self.net(x)
+    a, b = tf.split(h, 2, axis=-1)
+    return tfd.MultivariateNormalDiag(
+        loc=a,
+        scale_diag=tf.nn.softplus(b) + 1e-8)
+
+
+@gin.configurable
 class CovEncoder(ts.Module):
   '''
   Warning: current implementation is greatly inefficient. Only use as a last

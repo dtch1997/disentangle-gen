@@ -1,14 +1,12 @@
-train.model_type = "van"
 train.dset_name = "dsprites"
 train.s_dim = 5
 train.n_dim = 0
 train.factors = "l=0"
-train.z_transform = "sigmoid"
-mask_type = "label"
 train.batch_size = 64
-train.dec_lr = 1e-3
-train.enc_lr_mul = 1
+train.clas_lr = 1e-3
 train.iterations = 500000
+train.s_I_dim = 3
+mask_type = "label"
 
 make_masks.mask_type = %mask_type
 paired_randn.mask_type = %mask_type
@@ -22,17 +20,8 @@ Dense.initializer = @dense/initializer
 Conv2d.initializer = @conv/initializer
 ConvTranspose2d.initializer = @deconv/initializer
 
-Encoder.width = 1
-Encoder.spectral_norm = True
-
-Discriminator.width = 2
-Discriminator.share_dense = True
-Discriminator.uncond_bias = False
-Discriminator.mask_type = %mask_type
-
-LabelDiscriminator.width = 1
-LabelDiscriminator.share_dense = False
-LabelDiscriminator.uncond_bias = False
+Classifier.width = 1
+Classifier.spectral_norm = True
 
 weight_normalization.add.epsilon = 1e-3
 weight_normalization.add.scale = False

@@ -191,6 +191,32 @@ def label_data_generator(dset, masks, random_seed=None):
       output_shapes=(dset.observation_shape, (y_dim,)))
 
 
+def unmasked_label_data_generator(dset, s_dim, random_seed=None):
+  # Normalize the factors using mean and stddev
+  m, s = [], []
+  for factor_size in dset.factors_num_values:
+    factor_values = list(range(factor_size))
+    m.append(np.mean(factor_values))
+    s.append(np.std(factor_values))
+  m = np.array(m)
+  s = np.array(s)
+
+  def generator():
+    random_state = np.random.RandomState(random_seed)
+
+    while True:
+      # Note: remove batch dimension by returning x1[0], x2[0], y[0]
+      factors = dset.sample_factors(1, random_state)
+      x = dset.sample_observations_from_factors(factors, random_state)
+      factors = (factors - m) / s  # normalize the factors
+      yield x[0], factors[0]
+
+  return tf.data.Dataset.from_generator(
+      generator,
+      (tf.float32, tf.float32),
+      output_shapes=(dset.observation_shape, (s_dim,)))
+
+
 @gin.configurable
 def paired_randn(batch_size, z_dim, masks, mask_type="match"):
   if mask_type == "match":
@@ -259,7 +285,12 @@ def get_z_transform(z_transform):
     [_, i, j] = z_transform.split("-")
     i, j = int(i), int(j)
     def _transform(tensor):
-      tensor[:, i] = tensor[:, j] = (tensor[:, i] + tensor[:, j]) / 2
+      linear_trans = np.eyes(tensor.shape[-1])
+      linear_trans[:, i] = 0.5
+      temp =  (tensor[:, i] + tensor[:, j]) / 2
+      print("Test", temp)
+      tf.assign(tensor[:, i], temp)
+      tf.assign(tensor[:, j], temp)
       return tensor
     return _transform
   elif z_transform.startswith("swap"):
