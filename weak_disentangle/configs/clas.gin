@@ -4,8 +4,8 @@ train.n_dim = 0
 train.factors = "l=0"
 train.batch_size = 64
 train.clas_lr = 1e-3
-train.iterations = 500000
-train.s_I_dim = 3
+train.iterations = 100000
+train.s_I_dim = 5
 mask_type = "label"
 
 make_masks.mask_type = %mask_type

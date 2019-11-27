@@ -33,7 +33,7 @@ from tqdm import tqdm
 
 from weak_disentangle import datasets, viz, networks, evaluate
 from weak_disentangle import utils as ut
-from weak_disentangle import metrics
+from weak_disentangle import metrics, new_metrics
 
 tf.enable_v2_behavior()
 tfk = tf.keras
@@ -43,6 +43,7 @@ tfk = tf.keras
 def train(dset_name, s_dim, n_dim, factors, z_transform,
           batch_size, dec_lr, enc_lr_mul, iterations,
           model_type="gen"):
+
   ut.log("In train")
   masks = datasets.make_masks(factors, s_dim)
   z_dim = s_dim + n_dim
@@ -75,9 +76,17 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
     gen = networks.Generator(x_shape, z_dim)
     enc = networks.CovEncoder(x_shape, s_dim)  # Encoder ignores nuisance param
     trans_enc = networks.CovEncoder(x_shape, s_dim)
+
+    clas_path = os.path.join(FLAGS.basedir, "clas")
+    clas = networks.Classifier(x_shape, s_dim)
+    ckpt_root = tf.train.Checkpoint(clas=clas)
+    latest_ckpt = tf.train.latest_checkpoint(clas_path)
+    ckpt_root.restore(latest_ckpt)
+
     ut.log(dis.read(dis.WITH_VARS))
     ut.log(gen.read(gen.WITH_VARS))
     ut.log(enc.read(enc.WITH_VARS))
+    ut.log(clas.read(clas.WITH_VARS))
 
   # Create optimizers
   if model_type in {"gen", "van"}:
@@ -299,16 +308,20 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
       elif model_type == "van":
         viz.ablation_visualization(x, x, gen_eval, z_dim, vizdir, global_step + 1)
 
-      num_s_I = 100
-      k = 150
-      y_real = tf.convert_to_tensor(dset.sample_factors(num_s_I, np.random.RandomState(1)), dtype=tf.float32)
-      masks = np.zeros(y_real.shape)
+      # num_s_I = 100
+      # k = 150
+      # y_real = tf.convert_to_tensor(dset.sample_factors(num_s_I, np.random.RandomState(1)), dtype=tf.float32)
+      samples = 64
+      masks = np.zeros([samples, z_dim])
       masks[:, 0] = 1
       masks = tf.convert_to_tensor(masks, dtype=tf.float32)
-      y_real = y_real * masks
-      mi = metrics.mi_estimate(y_real, gen, enc, masks, k, num_s_I, z_dim, s_dim)
-      mi_trans = metrics.mi_estimate(y_real, gen, trans_enc, masks, k, num_s_I, z_dim, s_dim, z_trans)
-      ut.log("Encoder MI: {} Transformed Encoder MI: {}".format(mi, mi_trans))
+      # y_real = y_real * masks
+      # mi = metrics.mi_estimate(y_real, gen, enc, masks, k, num_s_I, z_dim, s_dim)
+      # mi_trans = metrics.mi_estimate(y_real, gen, trans_enc, masks, k, num_s_I, z_dim, s_dim, z_trans)
+      # ut.log("Encoder MI: {} Transformed Encoder MI: {}".format(mi, mi_trans))
+      mi = new_metrics.mi_difference(z_dim, gen, clas, masks, samples)
+      mi_joint =  new_metrics.mi_difference(z_dim, gen, clas, masks, samples, draw_from_joint=True)
+      ut.log("MI:{} MI_Joint:{}".format(mi, mi_joint))
 
       if FLAGS.debug:
         ut.log("Encoder Metrics")

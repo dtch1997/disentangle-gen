@@ -35,7 +35,7 @@ def parallel_encode_into_s(z_I, gen, clas, masks, k=100, lock_samples=True, z_no
             z_notI = datasets.label_randn(batch_size, z_dim, masks)
         else:
             z_notI_extended = datasets.label_randn(batch_size * k, z_dim, masks_extended)
-    
+
     if z_notI_extended == None:
         z_notI_extended = tf.tile(z_notI, [k, 1])
 
@@ -85,7 +85,7 @@ def p_s(s_I, z_dim, gen, clas, masks, k=100, z_notI = None):
         return tf.reduce_mean(p_s.prob(s_I))
     else:
         z_I = datasets.label_randn(batch_size, z_dim, 1-masks)
-        p_s_zI = parallel_encode_into_s(z_I, gen, clas, masks, z_notI=z_notI)
+        p_s_zI, _ = parallel_encode_into_s(z_I, gen, clas, masks, z_notI=z_notI)
         return tf.reduce_mean(p_s_zI.prob(s_I))
 
 def mi_estimate(z_dim, gen, clas, masks, batch_size, k=100):
@@ -104,8 +104,8 @@ def mi_difference(z_dim, gen, clas, masks, batch_size, k=100, draw_from_joint=Fa
         z_I = z * masks
         z_notI = z * (1-masks)
 
-        p_s_zI = parallel_encode_into_s(z_I, gen, clas, masks, k=k, lock_samples=False)
-        p_s_znotI = parallel_encode_into_s(z_notI, gen, clas, masks, k=k, lock_samples=False)
+        p_s_zI, _ = parallel_encode_into_s(z_I, gen, clas, masks, k=k, lock_samples=False)
+        p_s_znotI, _ = parallel_encode_into_s(z_notI, gen, clas, masks, k=k, lock_samples=False)
 
         return tf.reduce_mean(p_s_zI.log_prob(s_I) - p_s_znotI.log_prob(s_I))
     else:
