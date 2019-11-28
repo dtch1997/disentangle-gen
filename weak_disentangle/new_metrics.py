@@ -75,7 +75,8 @@ def p_s(s_I, z_dim, gen, clas, masks, k=100, z_notI = None):
     """
     batch_size, s_dim = s_I.shape
 
-    if z_notI == None:
+    if z_notI is None:
+
         # generate
         blank_mask = tf.zeros([batch_size, z_dim])
         z = datasets.label_randn(batch_size, z_dim, blank_mask)
