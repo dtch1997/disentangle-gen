@@ -30,13 +30,13 @@ def parallel_encode_into_s(z_I, gen, clas, masks, k=100, lock_samples=True, z_no
     masks_extended = tf.tile(masks, [k, 1])
     z_notI_extended = None
 
-    if z_notI == None:
+    if z_notI is None:
         if lock_samples:
             z_notI = datasets.label_randn(batch_size, z_dim, masks)
         else:
             z_notI_extended = datasets.label_randn(batch_size * k, z_dim, masks_extended)
 
-    if z_notI_extended == None:
+    if z_notI_extended is None:
         z_notI_extended = tf.tile(z_notI, [k, 1])
 
     z = z_I_extended + z_notI_extended
