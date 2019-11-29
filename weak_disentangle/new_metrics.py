@@ -8,7 +8,7 @@ from weak_disentangle import datasets, viz, networks, evaluate
 
 tfd = tfp.distributions
 
-def parallel_encode_into_s(z_I, gen, clas, masks, k=100, lock_samples=True, z_notI=None):
+def parallel_encode_into_s(z_I, gen, clas, masks, z_prior, k=100, lock_samples=True, z_notI=None):
     """
     Estimates p(s_I | z_I) based on sampling.
 
@@ -32,9 +32,9 @@ def parallel_encode_into_s(z_I, gen, clas, masks, k=100, lock_samples=True, z_no
 
     if z_notI is None:
         if lock_samples:
-            z_notI = datasets.label_randn(batch_size, z_dim, masks)
+            z_notI = z_prior(batch_size, z_dim, masks)
         else:
-            z_notI_extended = datasets.label_randn(batch_size * k, z_dim, masks_extended)
+            z_notI_extended = z_prior(batch_size * k, z_dim, masks_extended)
 
     if z_notI_extended is None:
         z_notI_extended = tf.tile(z_notI, [k, 1])
@@ -57,7 +57,7 @@ def parallel_encode_into_s(z_I, gen, clas, masks, k=100, lock_samples=True, z_no
 
     return s_dist, z_notI
 
-def p_s(s_I, z_dim, gen, clas, masks, k=100, z_notI = None):
+def p_s(s_I, z_dim, gen, clas, masks, z_prior, k=100, z_notI = None):
     """
     Estimates p(s_I) based on sampling. Batched
 
@@ -79,37 +79,38 @@ def p_s(s_I, z_dim, gen, clas, masks, k=100, z_notI = None):
 
         # generate
         blank_mask = tf.zeros([batch_size, z_dim])
-        z = datasets.label_randn(batch_size, z_dim, blank_mask)
+        z = z_prior(batch_size, z_dim, blank_mask)
         x_hat = tf.stop_gradient(gen(z))
 
         p_s = clas(x_hat) #  distribs: (batch * k, s_dim = z_dim)
         return tf.reduce_mean(p_s.prob(s_I))
     else:
-        z_I = datasets.label_randn(batch_size, z_dim, 1-masks)
-        p_s_zI, _ = parallel_encode_into_s(z_I, gen, clas, masks, z_notI=z_notI)
+        z_I = z_prior(batch_size, z_dim, 1-masks)
+        p_s_zI, _ = parallel_encode_into_s(z_I, gen, clas, masks, z_prior, z_notI=z_notI)
         return tf.reduce_mean(p_s_zI.prob(s_I))
 
-def mi_estimate(z_dim, gen, clas, masks, batch_size, k=100):
-    z_I = datasets.label_randn(batch_size, z_dim, 1-masks)
-    s_distr, z_notI = parallel_encode_into_s(z_I, gen, clas, masks, k=k, lock_samples=True)
+def mi_estimate(z_dim, gen, clas, masks, batch_size, z_prior, k=100):
+    z_I = z_prior(batch_size, z_dim, 1-masks)
+    s_distr, z_notI = parallel_encode_into_s(z_I, gen, clas, masks, z_prior, k=k, lock_samples=True)
     s_I = s_distr.sample()
     logp_siz = s_distr.log_prob(s_I)
-    logp_si = tf.log(p_s(s_I, z_dim, gen, clas, masks, z_notI=z_notI))
+    logp_si = tf.log(p_s(s_I, z_dim, gen, clas, masks, z_prior, z_notI=z_notI))
     return tf.reduce_mean(logp_siz - logp_si)
 
-def mi_difference(z_dim, gen, clas, masks, batch_size, k=100, draw_from_joint=False):
+def mi_difference(z_dim, gen, clas, masks, batch_size, k=100, draw_from_joint=False
+    , z_prior = datasets.label_randn):
     if draw_from_joint:
         blank_mask = tf.zeros([batch_size, z_dim])
-        z = datasets.label_randn(batch_size, z_dim, blank_mask)
+        z = z_prior(batch_size, z_dim, blank_mask)
         s_I = clas(tf.stop_gradient(gen(z))).sample()
         z_I = z * masks
         z_notI = z * (1-masks)
 
-        p_s_zI, _ = parallel_encode_into_s(z_I, gen, clas, masks, k=k, lock_samples=False)
-        p_s_znotI, _ = parallel_encode_into_s(z_notI, gen, clas, masks, k=k, lock_samples=False)
+        p_s_zI, _ = parallel_encode_into_s(z_I, gen, clas, masks, z_prior, k=k, lock_samples=False)
+        p_s_znotI, _ = parallel_encode_into_s(z_notI, gen, clas, masks, z_prior, k=k, lock_samples=False)
 
         return tf.reduce_mean(p_s_zI.log_prob(s_I) - p_s_znotI.log_prob(s_I))
     else:
-        I_zI = mi_estimate(z_dim, gen,clas, masks, batch_size, k=k)
-        I_znotI = mi_estimate(z_dim, gen, clas, 1-masks, batch_size, k=k)
+        I_zI = mi_estimate(z_dim, gen,clas, masks, batch_size, z_prior, k=k)
+        I_znotI = mi_estimate(z_dim, gen, clas, 1-masks, batch_size, z_prior, k=k)
         return I_zI - I_znotI

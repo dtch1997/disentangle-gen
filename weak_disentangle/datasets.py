@@ -275,6 +275,26 @@ def label_randn(batch_size, z_dim, masks):
     z = tf.concat((z, n), axis=-1)
     return z
 
+def unmixed_prior(shift, scale):
+  '''
+  Returns prior equivalent to translation of latent variables by shift and
+  scaling by scale_factor.
+  '''
+  def _unmixed_prior(batch_size, z_dim, masks):
+    z = tf.random.normal((batch_size, z_dim), mean=-shift, stddev=1/scale)
+    return z * (1 - masks)
+
+  return _unmixed_prior
+
+def mixed_prior(batch_size, z_dim, masks):
+  '''
+  Performs z0, z1 -> (z0 - z1), z0 + z1 transformation
+  '''
+  z_0 = tf.random.normal((batch_size, 1))
+  z_1 = tf.random.normal((batch_size, 1))
+  z_rest = tf.random.normal((batch_size, z_dim - 2))
+  z = tf.concat((z_0 - z_1, z_0 + z_1, z_rest), axis = -1)
+  return z
 
 def get_z_transform(z_transform):
   if z_transform == "sigmoid":
