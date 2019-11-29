@@ -280,6 +280,24 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
   if FLAGS.debug:
     train_range = tqdm(train_range)
 
+  samples = 200
+  if FLAGS.evaluate:
+    masks = np.zeros([samples, z_dim])
+    masks[:, 0] = 1
+    masks = tf.convert_to_tensor(masks, dtype=tf.float32)
+
+    mi = new_metrics.mi_difference(z_dim, gen, clas, masks, samples)
+    unmixed_prior = datasets.unmixed_prior(FLAGS.shift, FLAGS.scale)
+    mi_unmixed = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = unmixed_prior)
+    mi_mixed = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = datasets.mixed_prior)
+    ut.log("MI - Normal: {} Unmixed: {} Mixed: {}".format(mi, mi_unmixed, mi_mixed))
+
+    mi_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, draw_from_joint=True)
+    mi_unmixed_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = unmixed_prior, draw_from_joint=True)
+    mi_mixed_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = datasets.mixed_prior, draw_from_joint=True)
+    ut.log("MI Joint - Normal: {} Unmixed: {} Mixed: {}".format(mi_joint, mi_unmixed_joint, mi_mixed_joint))
+
+
   for global_step in train_range:
     stopwatch = time.time()
     if model_type == "gen":
@@ -311,7 +329,6 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
       # num_s_I = 100
       # k = 150
       # y_real = tf.convert_to_tensor(dset.sample_factors(num_s_I, np.random.RandomState(1)), dtype=tf.float32)
-      samples = 200
       masks = np.zeros([samples, z_dim])
       masks[:, 0] = 1
       masks = tf.convert_to_tensor(masks, dtype=tf.float32)
@@ -415,4 +432,8 @@ if __name__ == "__main__":
       "scale",
       3,
       "Scaling for unmixed prior")
+  flags.DEFINE_boolean(
+      "evaluate",
+      False,
+      "Flag denoting whether to evaluate (for trained models)")
   app.run(main)
