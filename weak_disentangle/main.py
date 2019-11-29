@@ -51,7 +51,10 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
   z_trans = datasets.get_z_transform(z_transform)
 
   # Load data
-  dset = datasets.get_dlib_data(dset_name)
+  if FLAGS.evaluate:
+    dset = None
+  else:
+    dset = datasets.get_dlib_data(dset_name)
   if dset is None:
     x_shape = [64, 64, 1]
   else:
@@ -280,7 +283,7 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
   if FLAGS.debug:
     train_range = tqdm(train_range)
 
-  samples = 200
+  samples = 100
   if FLAGS.evaluate:
     masks = np.zeros([samples, z_dim])
     masks[:, 0] = 1
