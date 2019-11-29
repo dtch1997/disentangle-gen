@@ -269,20 +269,6 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
       resuming_iteration = iter_save * (int(ckpt_root.save_counter) - 1)
       train_range = range(resuming_iteration, iterations)
 
-  # Training
-  if dset is None:
-    ut.log("Dataset {} is not available".format(dset_name))
-    ut.log("Ending program having checked that the networks can be built.")
-    return
-
-  batches = datasets.paired_data_generator(dset, masks).repeat().batch(batch_size).prefetch(1000)
-  batches = iter(batches)
-  start_time = time.time()
-  train_time = 0
-
-  if FLAGS.debug:
-    train_range = tqdm(train_range)
-
   samples = 100
   if FLAGS.evaluate:
     masks = np.zeros([samples, z_dim])
@@ -300,6 +286,20 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
     mi_mixed_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = datasets.mixed_prior, draw_from_joint=True)
     ut.log("MI Joint - Normal: {} Unmixed: {} Mixed: {}".format(mi_joint, mi_unmixed_joint, mi_mixed_joint))
 
+
+  # Training
+  if dset is None:
+    ut.log("Dataset {} is not available".format(dset_name))
+    ut.log("Ending program having checked that the networks can be built.")
+    return
+
+  batches = datasets.paired_data_generator(dset, masks).repeat().batch(batch_size).prefetch(1000)
+  batches = iter(batches)
+  start_time = time.time()
+  train_time = 0
+
+  if FLAGS.debug:
+    train_range = tqdm(train_range)
 
   for global_step in train_range:
     stopwatch = time.time()
