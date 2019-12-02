@@ -269,7 +269,7 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
       resuming_iteration = iter_save * (int(ckpt_root.save_counter) - 1)
       train_range = range(resuming_iteration, iterations)
 
-  samples = 100
+  samples = FLAGS.val_samples
   if FLAGS.evaluate:
     masks = np.zeros([samples, z_dim])
     masks[:, 0] = 1
@@ -439,4 +439,8 @@ if __name__ == "__main__":
       "evaluate",
       False,
       "Flag denoting whether to evaluate (for trained models)")
+  flags.DEFINE_integer(
+      "val_samples",
+      100,
+      "Number of samples to use in evaluation")
   app.run(main)
