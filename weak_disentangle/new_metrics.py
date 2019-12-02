@@ -102,7 +102,7 @@ def mi_estimate(z_dim, gen, clas, masks, batch_size, z_prior, k=100):
 
 def mi_difference(z_dim, gen, clas, masks, batch_size, k=100, draw_from_joint=False
     , z_prior = datasets.label_randn):
-    if draw_from_joint
+    if draw_from_joint:
         blank_mask = tf.zeros([batch_size, z_dim])
         z = z_prior(batch_size, z_dim, blank_mask)
         s_I = clas(tf.stop_gradient(gen(z))).sample()
