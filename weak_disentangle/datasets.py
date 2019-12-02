@@ -294,7 +294,7 @@ def mixed_prior(batch_size, z_dim, masks):
   z_1 = tf.random.normal((batch_size, 1))
   z_rest = tf.random.normal((batch_size, z_dim - 2))
   z = tf.concat((z_0 - z_1, z_0 + z_1, z_rest), axis = -1)
-  return z
+  return z * (1-masks)
 
 def get_z_transform(z_transform):
   if z_transform == "sigmoid":
