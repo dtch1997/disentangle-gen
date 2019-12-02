@@ -76,8 +76,7 @@ def p_s(s_I, z_dim, gen, clas, masks, z_prior, k=100, p_s_zI = None, z_notI = No
     batch_size, s_dim = s_I.shape
 
     if z_notI is None:
-
-        # generate
+        # generate z fresh
         blank_mask = tf.zeros([batch_size, z_dim])
         z = z_prior(batch_size, z_dim, blank_mask)
         x_hat = tf.stop_gradient(gen(z))
@@ -85,11 +84,16 @@ def p_s(s_I, z_dim, gen, clas, masks, z_prior, k=100, p_s_zI = None, z_notI = No
         p_s = clas(x_hat) #  distribs: (batch * k, s_dim = z_dim)
         return tf.reduce_mean(p_s.prob(s_I))
     if p_s_zI is None:
+        # generate z_I fresh
         z_I = z_prior(batch_size, z_dim, 1-masks)
         p_s_zI, _ = parallel_encode_into_s(z_I, gen, clas, masks, z_prior, z_notI=z_notI)
         return tf.reduce_mean(p_s_zI.prob(s_I))
     else:
-        return tf.reduce_mean(p_s_zI.prob(s_I))
+        # p_s_dist = tfd.Mixture(
+        #     cat = tfd.Categorical(probs=tf.ones((batch_size,)) / batch_size),
+        #     components=[p_s_zI[i, :] for i in range(batch_size)])
+        p_s = [p_s_zI.prob(tf.tile(s, [batch_size, 1])) for s in tf.split(s_I, batch_size, 0))]
+        return tf.convert_to_tensor(p_s)
 
 def mi_estimate(z_dim, gen, clas, masks, batch_size, z_prior, k=100):
     z_I = z_prior(batch_size, z_dim, 1-masks)
