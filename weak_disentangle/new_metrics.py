@@ -92,7 +92,7 @@ def p_s(s_I, z_dim, gen, clas, masks, z_prior, k=100, p_s_zI = None, z_notI = No
         # p_s_dist = tfd.Mixture(
         #     cat = tfd.Categorical(probs=tf.ones((batch_size,)) / batch_size),
         #     components=[p_s_zI[i, :] for i in range(batch_size)])
-        p_s = [p_s_zI.prob(tf.tile(s, [batch_size, 1])) for s in tf.split(s_I, batch_size, 0))]
+        p_s = [tf.reduce_mean(p_s_zI.prob(tf.tile(s, [batch_size, 1]))) for s in tf.split(s_I, batch_size, 0)]
         return tf.convert_to_tensor(p_s)
 
 def mi_estimate(z_dim, gen, clas, masks, batch_size, z_prior, k=100):
