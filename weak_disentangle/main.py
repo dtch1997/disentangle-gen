@@ -46,11 +46,6 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
 
   ut.log("In train")
   masks = datasets.make_masks(factors, s_dim)
-  print(factors)
-  print(s_dim)
-  print(masks.shape)
-  print(masks)
-  raise Exception
   z_dim = s_dim + n_dim
   enc_lr = enc_lr_mul * dec_lr
   z_trans = datasets.get_z_transform(z_transform)
