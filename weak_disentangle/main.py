@@ -148,23 +148,23 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
     return dict(gen_loss=gen_loss, dis_loss=dis_loss, enc_loss=enc_loss)
 
   @tf.function
-  def train_van_step(x_real, y_real):
+  def train_van_step(x_real, y_real, entangle=False):
     gen.train()
     dis.train()
     enc.train()
     trans_enc.train()
 
-    if y_real is None:
-        if n_dim > 0:
-          padding = tf.zeros((y_real.shape[0], n_dim))
-          y_real_pad = tf.concat((y_real, padding), axis=-1)
-        else:
-          y_real_pad = y_real
-
+    if n_dim > 0:
+      padding = tf.zeros((y_real.shape[0], n_dim))
+      y_real_pad = tf.concat((y_real, padding), axis=-1)
+    else:
+      y_real_pad = y_real
+    
+    if entangle:
         # Alternate discriminator step and generator step
         with tf.GradientTape(persistent=False) as tape:
           # Generate
-          dummy_mask = np.zeros(masks.shape)
+          dummy_mask = tf.zeros_like(masks)
           z_fake = datasets.paired_randn(batch_size, z_dim, dummy_mask)
           x_fake = gen(z_fake)
 
@@ -176,6 +176,38 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
 
         gen_grads = tape.gradient(gen_loss, gen.trainable_variables)
         gen_opt.apply_gradients(zip(gen_grads, gen.trainable_variables))
+     
+        with tf.GradientTape(persistent=True) as tape:
+          # Generate
+          dummy_mask = tf.zeros_like(masks)
+          z_fake = datasets.paired_randn(batch_size, z_dim, dummy_mask)
+          x_fake = tf.stop_gradient(gen(z_fake))
+          trans_z_fake = z_trans(z_fake)
+
+          # Discriminate
+          x = tf.concat((x_real, x_fake), 0)
+          y = tf.concat((y_real, y_real), 0)
+          logits = dis(x, y)
+
+          # Encode
+          p_z = enc(x_fake)
+          p_z_trans = trans_enc(x_fake)
+
+          dis_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
+              logits=logits, labels=targets))
+          # Encoder ignores nuisance parameters (if they exist)
+          enc_loss = -tf.reduce_mean(p_z.log_prob(z_fake[:, :s_dim]))
+          trans_enc_loss = -tf.reduce_mean(p_z_trans.log_prob(
+            trans_z_fake[:, :s_dim]))
+
+        dis_grads = tape.gradient(dis_loss, dis.trainable_variables)
+        enc_grads = tape.gradient(enc_loss, enc.trainable_variables)
+        trans_enc_grads = tape.gradient(trans_enc_loss,
+          trans_enc.trainable_variables)
+
+        dis_opt.apply_gradients(zip(dis_grads, dis.trainable_variables))
+        enc_opt.apply_gradients(zip(enc_grads, enc.trainable_variables))
+        trans_enc_opt.apply_gradients(zip(trans_enc_grads, trans_enc.trainable_variables))
 
     else:
         if n_dim > 0:
@@ -200,37 +232,37 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
         gen_grads = tape.gradient(gen_loss, gen.trainable_variables)
         gen_opt.apply_gradients(zip(gen_grads, gen.trainable_variables))
 
-    with tf.GradientTape(persistent=True) as tape:
-      # Generate
-      z_fake = datasets.paired_randn(batch_size, z_dim, masks)
-      z_fake = z_fake + y_real_pad
-      x_fake = tf.stop_gradient(gen(z_fake))
-      trans_z_fake = z_trans(z_fake)
+        with tf.GradientTape(persistent=True) as tape:
+          # Generate
+          z_fake = datasets.paired_randn(batch_size, z_dim, masks)
+          z_fake = z_fake + y_real_pad
+          x_fake = tf.stop_gradient(gen(z_fake))
+          trans_z_fake = z_trans(z_fake)
 
-      # Discriminate
-      x = tf.concat((x_real, x_fake), 0)
-      y = tf.concat((y_real, y_real), 0)
-      logits = dis(x, y)
+          # Discriminate
+          x = tf.concat((x_real, x_fake), 0)
+          y = tf.concat((y_real, y_real), 0)
+          logits = dis(x, y)
 
-      # Encode
-      p_z = enc(x_fake)
-      p_z_trans = trans_enc(x_fake)
+          # Encode
+          p_z = enc(x_fake)
+          p_z_trans = trans_enc(x_fake)
 
-      dis_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-          logits=logits, labels=targets))
-      # Encoder ignores nuisance parameters (if they exist)
-      enc_loss = -tf.reduce_mean(p_z.log_prob(z_fake[:, :s_dim]))
-      trans_enc_loss = -tf.reduce_mean(p_z_trans.log_prob(
-        trans_z_fake[:, :s_dim]))
+          dis_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
+              logits=logits, labels=targets))
+          # Encoder ignores nuisance parameters (if they exist)
+          enc_loss = -tf.reduce_mean(p_z.log_prob(z_fake[:, :s_dim]))
+          trans_enc_loss = -tf.reduce_mean(p_z_trans.log_prob(
+            trans_z_fake[:, :s_dim]))
 
-    dis_grads = tape.gradient(dis_loss, dis.trainable_variables)
-    enc_grads = tape.gradient(enc_loss, enc.trainable_variables)
-    trans_enc_grads = tape.gradient(trans_enc_loss,
-      trans_enc.trainable_variables)
+        dis_grads = tape.gradient(dis_loss, dis.trainable_variables)
+        enc_grads = tape.gradient(enc_loss, enc.trainable_variables)
+        trans_enc_grads = tape.gradient(trans_enc_loss,
+          trans_enc.trainable_variables)
 
-    dis_opt.apply_gradients(zip(dis_grads, dis.trainable_variables))
-    enc_opt.apply_gradients(zip(enc_grads, enc.trainable_variables))
-    trans_enc_opt.apply_gradients(zip(trans_enc_grads, trans_enc.trainable_variables))
+        dis_opt.apply_gradients(zip(dis_grads, dis.trainable_variables))
+        enc_opt.apply_gradients(zip(enc_grads, enc.trainable_variables))
+        trans_enc_opt.apply_gradients(zip(trans_enc_grads, trans_enc.trainable_variables))
 
     return dict(gen_loss=gen_loss, dis_loss=dis_loss, enc_loss=enc_loss, trans_enc_loss=trans_enc_loss)
 
@@ -333,10 +365,7 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
       vals = train_gen_step(x1, x2, y)
     elif model_type == "van":
       x, y = next(batches)
-      if FLAGS.entangle:
-        vals = train_van_step(x, None)
-      else:
-        vals = train_van_step(x, y)
+      vals = train_van_step(x, y, FLAGS.entangle)
     train_time += time.time() - stopwatch
 
     # Generic bookkeeping
