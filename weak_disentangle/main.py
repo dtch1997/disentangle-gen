@@ -46,6 +46,11 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
 
   ut.log("In train")
   masks = datasets.make_masks(factors, s_dim)
+  print(factors)
+  print(s_dim)
+  print(masks.shape)
+  print(masks)
+  raise Exception
   z_dim = s_dim + n_dim
   enc_lr = enc_lr_mul * dec_lr
   z_trans = datasets.get_z_transform(z_transform)
@@ -154,27 +159,51 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
     enc.train()
     trans_enc.train()
 
-    if n_dim > 0:
-      padding = tf.zeros((y_real.shape[0], n_dim))
-      y_real_pad = tf.concat((y_real, padding), axis=-1)
+    if y_real is None:
+        if n_dim > 0:
+          padding = tf.zeros((y_real.shape[0], n_dim))
+          y_real_pad = tf.concat((y_real, padding), axis=-1)
+        else:
+          y_real_pad = y_real
+
+        # Alternate discriminator step and generator step
+        with tf.GradientTape(persistent=False) as tape:
+          # Generate
+          dummy_mask = np.zeros(masks.shape)
+          z_fake = datasets.paired_randn(batch_size, z_dim, dummy_mask)
+          x_fake = gen(z_fake)
+
+          # Discriminate
+          logits_fake = dis(x_fake, y_real)
+
+          gen_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
+              logits=logits_fake, labels=targets_real))
+
+        gen_grads = tape.gradient(gen_loss, gen.trainable_variables)
+        gen_opt.apply_gradients(zip(gen_grads, gen.trainable_variables))
+
     else:
-      y_real_pad = y_real
+        if n_dim > 0:
+          padding = tf.zeros((y_real.shape[0], n_dim))
+          y_real_pad = tf.concat((y_real, padding), axis=-1)
+        else:
+          y_real_pad = y_real
 
-    # Alternate discriminator step and generator step
-    with tf.GradientTape(persistent=False) as tape:
-      # Generate
-      z_fake = datasets.paired_randn(batch_size, z_dim, masks)
-      z_fake = z_fake + y_real_pad
-      x_fake = gen(z_fake)
+        # Alternate discriminator step and generator step
+        with tf.GradientTape(persistent=False) as tape:
+          # Generate
+          z_fake = datasets.paired_randn(batch_size, z_dim, masks)
+          z_fake = z_fake + y_real_pad
+          x_fake = gen(z_fake)
 
-      # Discriminate
-      logits_fake = dis(x_fake, y_real)
+          # Discriminate
+          logits_fake = dis(x_fake, y_real)
 
-      gen_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-          logits=logits_fake, labels=targets_real))
+          gen_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
+              logits=logits_fake, labels=targets_real))
 
-    gen_grads = tape.gradient(gen_loss, gen.trainable_variables)
-    gen_opt.apply_gradients(zip(gen_grads, gen.trainable_variables))
+        gen_grads = tape.gradient(gen_loss, gen.trainable_variables)
+        gen_opt.apply_gradients(zip(gen_grads, gen.trainable_variables))
 
     with tf.GradientTape(persistent=True) as tape:
       # Generate
@@ -275,16 +304,17 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
     masks[:, 0] = 1
     masks = tf.convert_to_tensor(masks, dtype=tf.float32)
 
-    mi = new_metrics.mi_difference(z_dim, gen, clas, masks, samples)
-    unmixed_prior = datasets.unmixed_prior(FLAGS.shift, FLAGS.scale)
-    mi_unmixed = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = unmixed_prior)
-    mi_mixed = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = datasets.mixed_prior)
-    ut.log("MI - Normal: {} Unmixed: {} Mixed: {}".format(mi, mi_unmixed, mi_mixed))
+    for _ in range(5):
+        mi = new_metrics.mi_difference(z_dim, gen, clas, masks, samples)
+        unmixed_prior = datasets.unmixed_prior(FLAGS.shift, FLAGS.scale)
+        mi_unmixed = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = unmixed_prior)
+        mi_mixed = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = datasets.mixed_prior)
+        ut.log("MI - Normal: {}, {} Unmixed: {}, {} Mixed: {}, {}".format(mi[0], mi[1], mi_unmixed[0], mi_unmixed[1], mi_mixed[0], mi_mixed[1]))
 
-    mi_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, draw_from_joint=True)
-    mi_unmixed_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = unmixed_prior, draw_from_joint=True)
-    mi_mixed_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = datasets.mixed_prior, draw_from_joint=True)
-    ut.log("MI Joint - Normal: {} Unmixed: {} Mixed: {}".format(mi_joint, mi_unmixed_joint, mi_mixed_joint))
+        mi_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, draw_from_joint=True)
+        mi_unmixed_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = unmixed_prior, draw_from_joint=True)
+        mi_mixed_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = datasets.mixed_prior, draw_from_joint=True)
+        ut.log("MI Joint - Normal: {} Unmixed: {} Mixed: {}".format(mi_joint, mi_unmixed_joint, mi_mixed_joint))
 
 
   # Training
@@ -308,7 +338,10 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
       vals = train_gen_step(x1, x2, y)
     elif model_type == "van":
       x, y = next(batches)
-      vals = train_van_step(x, y)
+      if FLAGS.entangle:
+        vals = train_van_step(x, None)
+      else:
+        vals = train_van_step(x, y)
     train_time += time.time() - stopwatch
 
     # Generic bookkeeping
@@ -346,7 +379,7 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
       unmixed_prior = datasets.unmixed_prior(FLAGS.shift, FLAGS.scale)
       mi_unmixed = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = unmixed_prior)
       mi_mixed = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = datasets.mixed_prior)
-      ut.log("MI - Normal: {} Unmixed: {} Mixed: {}".format(mi, mi_unmixed, mi_mixed))
+      ut.log("MI - Normal: {}, {} Unmixed: {}, {} Mixed: {}, {}".format(mi[0], mi[1], mi_unmixed[0], mi_unmixed[1], mi_mixed[0], mi_mixed[1]))
 
       mi_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, draw_from_joint=True)
       mi_unmixed_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = unmixed_prior, draw_from_joint=True)
@@ -443,4 +476,8 @@ if __name__ == "__main__":
       "val_samples",
       100,
       "Number of samples to use in evaluation")
+  flags.DEFINE_boolean(
+      "entangle",
+      False,
+      "Set to true to train an entangled model")
   app.run(main)
