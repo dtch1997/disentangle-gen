@@ -3,7 +3,7 @@ train.dset_name = "dsprites"
 train.s_dim = 5
 train.n_dim = 0
 train.factors = "l=0"
-train.z_transform = "sigmoid"
+train.z_transform = "scale"
 mask_type = "label"
 train.batch_size = 64
 train.dec_lr = 1e-3

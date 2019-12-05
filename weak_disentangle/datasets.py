@@ -307,6 +307,10 @@ def get_z_transform(z_transform):
     return tf.math.sigmoid
   elif z_transform == "tanh":
     return tf.math.tanh
+  elif z_transform == "scale":
+    def _transform(tensor):
+      return tensor * 3
+    return _transform
   elif z_transform.startswith("mix"):
     [_, i, j] = z_transform.split("-")
     i, j = int(i), int(j)

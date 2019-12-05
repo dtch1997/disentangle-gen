@@ -422,9 +422,9 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
       # num_s_I = 100
       # k = 150
       # y_real = tf.convert_to_tensor(dset.sample_factors(num_s_I, np.random.RandomState(1)), dtype=tf.float32)
-      masks = np.zeros([samples, z_dim])
-      masks[:, 0] = 1
-      masks = tf.convert_to_tensor(masks, dtype=tf.float32)
+      # masks = np.zeros([samples, z_dim])
+      # masks[:, 0] = 1
+      # masks = tf.convert_to_tensor(masks, dtype=tf.float32)
       # y_real = y_real * masks
       # mi = metrics.mi_estimate(y_real, gen, enc, masks, k, num_s_I, z_dim, s_dim)
       # mi_trans = metrics.mi_estimate(y_real, gen, trans_enc, masks, k, num_s_I, z_dim, s_dim, z_trans)
@@ -432,16 +432,16 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
       # mi = new_metrics.mi_difference(z_dim, gen, clas, masks, samples)
       # mi_joint =  new_metrics.mi_difference(z_dim, gen, clas, masks, samples, draw_from_joint=True)
       # ut.log("MI:{} MI_Joint:{}".format(mi, mi_joint))
-      mi = new_metrics.mi_difference(z_dim, gen, clas, masks, samples)
-      unmixed_prior = datasets.unmixed_prior(FLAGS.shift, FLAGS.scale)
-      mi_unmixed = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = unmixed_prior)
-      mi_mixed = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = datasets.mixed_prior)
-      ut.log("MI - Normal: {}, {} Unmixed: {}, {} Mixed: {}, {}".format(mi[0], mi[1], mi_unmixed[0], mi_unmixed[1], mi_mixed[0], mi_mixed[1]))
-
-      mi_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, draw_from_joint=True)
-      mi_unmixed_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = unmixed_prior, draw_from_joint=True)
-      mi_mixed_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = datasets.mixed_prior, draw_from_joint=True)
-      ut.log("MI Joint - Normal: {} Unmixed: {} Mixed: {}".format(mi_joint, mi_unmixed_joint, mi_mixed_joint))
+      # mi = new_metrics.mi_difference(z_dim, gen, clas, masks, samples)
+      # unmixed_prior = datasets.unmixed_prior(FLAGS.shift, FLAGS.scale)
+      # mi_unmixed = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = unmixed_prior)
+      # mi_mixed = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = datasets.mixed_prior)
+      # ut.log("MI - Normal: {}, {} Unmixed: {}, {} Mixed: {}, {}".format(mi[0], mi[1], mi_unmixed[0], mi_unmixed[1], mi_mixed[0], mi_mixed[1]))
+      #
+      # mi_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, draw_from_joint=True)
+      # mi_unmixed_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = unmixed_prior, draw_from_joint=True)
+      # mi_mixed_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = datasets.mixed_prior, draw_from_joint=True)
+      # ut.log("MI Joint - Normal: {} Unmixed: {} Mixed: {}".format(mi_joint, mi_unmixed_joint, mi_mixed_joint))
 
 
       if FLAGS.debug:
