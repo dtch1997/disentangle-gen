@@ -537,15 +537,12 @@ if __name__ == "__main__":
       "val_samples",
       100,
       "Number of samples to use in evaluation")
-<<<<<<< HEAD
   flags.DEFINE_boolean(
       "entangle",
       False,
       "Set to true to train an entangled model")
-=======
   flags.DEFINE_integer(
       "mi_averages",
       10,
       "Number of averages to use in evaluation")
->>>>>>> 3d378910e5013ce2d3b4619d5605ef1fe51563cb
   app.run(main)
