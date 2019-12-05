@@ -159,7 +159,7 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
       y_real_pad = tf.concat((y_real, padding), axis=-1)
     else:
       y_real_pad = y_real
-    
+
     if entangle:
         # Alternate discriminator step and generator step
         with tf.GradientTape(persistent=False) as tape:
@@ -176,7 +176,7 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
 
         gen_grads = tape.gradient(gen_loss, gen.trainable_variables)
         gen_opt.apply_gradients(zip(gen_grads, gen.trainable_variables))
-     
+
         with tf.GradientTape(persistent=True) as tape:
           # Generate
           dummy_mask = tf.zeros_like(masks)
@@ -371,6 +371,9 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
                           FLAGS.gin_bindings,
                           pida_sample_size=1000,
                           dlib_metrics=FLAGS.debug_dlib_metrics)
+
+    ut.log("Completed Evaluation")
+    return
 
   # Training
   if dset is None:
