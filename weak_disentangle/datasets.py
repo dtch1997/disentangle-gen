@@ -294,7 +294,8 @@ def mixed_prior(batch_size, z_dim, masks):
   z_1 = tf.random.normal((batch_size, 1))
   z_rest = tf.random.normal((batch_size, z_dim - 2))
   z = tf.concat((z_0 - z_1, z_0 + z_1, z_rest), axis = -1)
-  return z * (1-masks)
+  return z * (1 - masks)
+
 
 def get_z_transform(z_transform):
   if z_transform == "sigmoid":
@@ -308,7 +309,6 @@ def get_z_transform(z_transform):
       linear_trans = np.eyes(tensor.shape[-1])
       linear_trans[:, i] = 0.5
       temp =  (tensor[:, i] + tensor[:, j]) / 2
-      print("Test", temp)
       tf.assign(tensor[:, i], temp)
       tf.assign(tensor[:, j], temp)
       return tensor
