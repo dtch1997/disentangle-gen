@@ -49,12 +49,12 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
   z_dim = s_dim + n_dim
   enc_lr = enc_lr_mul * dec_lr
   z_trans = datasets.get_z_transform(z_transform)
-
   # Load data
-  if FLAGS.evaluate:
-    dset = None
-  else:
-    dset = datasets.get_dlib_data(dset_name)
+  dset = datasets.get_dlib_data(dset_name)
+  # if FLAGS.evaluate:
+  #   dset = None
+  # else:
+  #   dset = datasets.get_dlib_data(dset_name)
   if dset is None:
     x_shape = [64, 64, 1]
   else:
@@ -275,17 +275,46 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
     masks[:, 0] = 1
     masks = tf.convert_to_tensor(masks, dtype=tf.float32)
 
-    mi = new_metrics.mi_difference(z_dim, gen, clas, masks, samples)
-    unmixed_prior = datasets.unmixed_prior(FLAGS.shift, FLAGS.scale)
-    mi_unmixed = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = unmixed_prior)
-    mi_mixed = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = datasets.mixed_prior)
-    ut.log("MI - Normal: {} Unmixed: {} Mixed: {}".format(mi, mi_unmixed, mi_mixed))
+    transformed_prior = datasets.transformed_prior(z_trans)
+    mi, mi_trans, mi_joint, mi_joint_trans = [], [], [], []
 
-    mi_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, draw_from_joint=True)
-    mi_unmixed_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = unmixed_prior, draw_from_joint=True)
-    mi_mixed_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = datasets.mixed_prior, draw_from_joint=True)
-    ut.log("MI Joint - Normal: {} Unmixed: {} Mixed: {}".format(mi_joint, mi_unmixed_joint, mi_mixed_joint))
+    for i in range(FLAGS.mi_averages):
+      mi.append(new_metrics.mi_difference(z_dim, gen, clas, masks, samples))
+      mi_trans.append(new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = transformed_prior))
 
+      mi_joint.append(new_metrics.mi_difference(z_dim, gen, clas, masks, samples, draw_from_joint=True))
+      mi_joint_trans.append(new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = transformed_prior, draw_from_joint=True))
+
+    mi = np.mean(np.stack(mi), axis=0)
+    mi_trans = np.mean(np.stack(mi_trans), axis=0)
+
+    mi_joint = np.mean(mi_joint)
+    mi_joint_trans = np.mean(mi_joint_trans)
+
+    ut.log("MI - Normal: {}, {} Trans: {}, {}".format(mi[0], mi[1], mi_trans[0], mi_trans[1]))
+    # mi = new_metrics.mi_difference(z_dim, gen, clas, masks, samples)
+    # unmixed_prior = datasets.unmixed_prior(FLAGS.shift, FLAGS.scale)
+    # mi_unmixed = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = unmixed_prior)
+    # mi_mixed = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = datasets.mixed_prior)
+    # ut.log("MI - Normal: {}, {} Unmixed: {}, {} Mixed: {}, {}".format(mi[0], mi[1], mi_unmixed[0], mi_unmixed[1], mi_mixed[0], mi_mixed[1]))
+
+    # mi_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, draw_from_joint=True)
+    # mi_unmixed_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = unmixed_prior, draw_from_joint=True)
+    # mi_mixed_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = datasets.mixed_prior, draw_from_joint=True)
+    ut.log("MI Joint - Normal: {} Trans: {}".format(mi_joint, mi_joint_trans))
+
+    ut.log("Encoder Metrics")
+    evaluate.evaluate_enc(enc_np, dset, s_dim,
+                          FLAGS.gin_file,
+                          FLAGS.gin_bindings,
+                          pida_sample_size=1000,
+                          dlib_metrics=FLAGS.debug_dlib_metrics)
+    ut.log("Transformed Encoder Metrics")
+    evaluate.evaluate_enc(trans_enc_np, dset, s_dim,
+                          FLAGS.gin_file,
+                          FLAGS.gin_bindings,
+                          pida_sample_size=1000,
+                          dlib_metrics=FLAGS.debug_dlib_metrics)
 
   # Training
   if dset is None:
@@ -300,6 +329,8 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
 
   if FLAGS.debug:
     train_range = tqdm(train_range)
+  if FLAGS.visualize:
+    train_range = range(iterations+1)
 
   for global_step in train_range:
     stopwatch = time.time()
@@ -346,7 +377,7 @@ def train(dset_name, s_dim, n_dim, factors, z_transform,
       unmixed_prior = datasets.unmixed_prior(FLAGS.shift, FLAGS.scale)
       mi_unmixed = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = unmixed_prior)
       mi_mixed = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = datasets.mixed_prior)
-      ut.log("MI - Normal: {} Unmixed: {} Mixed: {}".format(mi, mi_unmixed, mi_mixed))
+      ut.log("MI - Normal: {}, {} Unmixed: {}, {} Mixed: {}, {}".format(mi[0], mi[1], mi_unmixed[0], mi_unmixed[1], mi_mixed[0], mi_mixed[1]))
 
       mi_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, draw_from_joint=True)
       mi_unmixed_joint = new_metrics.mi_difference(z_dim, gen, clas, masks, samples, z_prior = unmixed_prior, draw_from_joint=True)
@@ -439,8 +470,16 @@ if __name__ == "__main__":
       "evaluate",
       False,
       "Flag denoting whether to evaluate (for trained models)")
+  flags.DEFINE_boolean(
+      "visualize",
+      False,
+      "Flag denoting whether to visualize (for trained models)")
   flags.DEFINE_integer(
       "val_samples",
       100,
       "Number of samples to use in evaluation")
+  flags.DEFINE_integer(
+      "mi_averages",
+      10,
+      "Number of averages to use in evaluation")
   app.run(main)
