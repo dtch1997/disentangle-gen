@@ -13,6 +13,10 @@ z_dim = 2
 s_I_dim = 1
 samples = 1000
 
+masks = np.zeros([samples, z_dim])
+masks[:, 0] = 1
+masks = tf.convert_to_tensor(masks, dtype=tf.float32)
+
 def test_gen(z):
     # identity function
     return z
@@ -23,6 +27,11 @@ def test_clas(x):
         loc=a,
         scale_diag=1e-8)
 
+z_trans = datasets.get_z_transform(z_transform)
+transformed_prior = datasets.transformed_prior(z_trans)
+
 MI = new_metrics_redux.mi_difference(z_dim, test_gen, test_clas, masks, samples)
+MI_transformed = new_metrics_redux.mi_difference(z_dim, test_gen, test_clas, masks, samples, z_prior = transformed_prior)
 print(MI)
+
 

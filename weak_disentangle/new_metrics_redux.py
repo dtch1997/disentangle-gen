@@ -82,7 +82,7 @@ def p_s(s_I, z_dim, gen, clas, masks, z_prior, k=100, p_s_zI = None, z_notI = No
         blank_mask = tf.zeros([batch_size, z_dim])
         z = z_prior(batch_size, z_dim, blank_mask)
         # x_hat = tf.stop_gradient(gen(z))
-         x_hat = gen(z)
+        x_hat = gen(z)
 
         p_s = clas(x_hat) #  distribs: (batch * k, s_dim = z_dim)
         return tf.reduce_mean(p_s.prob(s_I))
