@@ -8,7 +8,8 @@ from weak_disentangle import datasets, viz, networks, evaluate
 
 tfd = tfp.distributions
 
-def parallel_encode_into_s(z_I, gen, clas, masks, z_prior, k=100, lock_samples=True, z_notI=None):
+def parallel_encode_into_s(z_I, gen, clas, masks, z_prior, k=100, lock_samples=True, z_notI=None,
+    return_s_marg=True):
     """
     Estimates p(s_I | z_I) based on sampling.
 
@@ -55,9 +56,22 @@ def parallel_encode_into_s(z_I, gen, clas, masks, z_prior, k=100, lock_samples=T
         components=p_s_split
     ) # distr.shape = (batch_size, z_dim)
 
+    # if return_s_marg:
+    #   marg_split = [tfd.MultivariateNormalDiag(loc = m, scale_diag = s) for m, s in zip(tf.split(means, means.shape[0]), tf.split(stds, stds.shape[0]))]
+    #   cat = tfd.Categorical(probs=tf.ones((1, batch_size * k)) / (batch_size * k))
+    #
+    #   s_dist_marg = tfd.Mixture(
+    #       cat=cat,
+    #       components=marg_split
+    #   ) # distr.shape = (1, z_dim)
+    #
+    #   return s_dist, z_notI, s_dist_marg
+    # else:
+    #   return s_dist, z_notI
     return s_dist, z_notI
 
-def p_s(s_I, z_dim, gen, clas, masks, z_prior, k=100, p_s_zI = None, z_notI = None):
+def p_s(s_I, z_dim, gen, clas, masks, z_prior, k=100, p_s_zI = None, z_notI = None,
+    s_dist_marg = None):
     """
     Estimates p(s_I) based on sampling. Batched
 
@@ -83,6 +97,13 @@ def p_s(s_I, z_dim, gen, clas, masks, z_prior, k=100, p_s_zI = None, z_notI = No
 
         p_s = clas(x_hat) #  distribs: (batch * k, s_dim = z_dim)
         return tf.reduce_mean(p_s.prob(s_I))
+
+    # if s_dist_marg is not None:
+    #     p_s = [s_dist_marg.prob(s) for s in tf.split(s_I, batch_size, 0)]
+    #     p_s_exclude = [(tf.reduce_sum(x) - x[i]) / (batch_size - 1) for i, x in enumerate(p_s)]
+    #     p_s = [tf.reduce_mean(x) for x in p_s]
+    #     return tf.convert_to_tensor(p_s), tf.convert_to_tensor(p_s_exclude)
+
     if p_s_zI is None:
         # generate z_I fresh
         z_I = z_prior(batch_size, z_dim, 1-masks)
@@ -102,9 +123,11 @@ def mi_estimate(z_dim, gen, clas, masks, batch_size, z_prior, k=100):
     s_distr, z_notI = parallel_encode_into_s(z_I, gen, clas, masks, z_prior, k=k, lock_samples=True)
     s_I = s_distr.sample()
     logp_siz = s_distr.log_prob(s_I)
-    # logp_si = tf.log(p_s(s_I, z_dim, gen, clas, masks, z_prior, z_notI=z_notI))
-    p_s_dist, p_s_exclude_dist = p_s(s_I, z_dim, gen, clas, masks, z_prior, p_s_zI= s_distr, z_notI=z_notI)
-    return tf.reduce_mean(logp_siz - tf.log(p_s_dist)), tf.reduce_mean(logp_siz - tf.log(p_s_exclude_dist))
+    logp_si = tf.log(p_s(s_I, z_dim, gen, clas, masks, z_prior, z_notI=z_notI))
+    # p_s_dist, p_s_exclude_dist = p_s(s_I, z_dim, gen, clas, masks, z_prior, s_dist_marg=s_dist_marg, z_notI=z_notI)
+    # return tf.reduce_mean(logp_siz - tf.log(p_s_dist)), tf.reduce_mean(logp_siz - tf.log(p_s_exclude_dist))
+    result = tf.reduce_mean(logp_siz - logp_si)
+    return result, result
 
 def mi_difference(z_dim, gen, clas, masks, batch_size, k=100, draw_from_joint=False
     , z_prior = datasets.label_randn):
