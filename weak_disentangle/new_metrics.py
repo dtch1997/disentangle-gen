@@ -123,11 +123,11 @@ def mi_estimate(z_dim, gen, clas, masks, batch_size, z_prior, k=100):
     s_distr, z_notI = parallel_encode_into_s(z_I, gen, clas, masks, z_prior, k=k, lock_samples=True)
     s_I = s_distr.sample()
     logp_siz = s_distr.log_prob(s_I)
-    logp_si = tf.log(p_s(s_I, z_dim, gen, clas, masks, z_prior, z_notI=z_notI))
-    # p_s_dist, p_s_exclude_dist = p_s(s_I, z_dim, gen, clas, masks, z_prior, s_dist_marg=s_dist_marg, z_notI=z_notI)
-    # return tf.reduce_mean(logp_siz - tf.log(p_s_dist)), tf.reduce_mean(logp_siz - tf.log(p_s_exclude_dist))
-    result = tf.reduce_mean(logp_siz - logp_si)
-    return result, result
+    # logp_si = tf.log(p_s(s_I, z_dim, gen, clas, masks, z_prior, z_notI=z_notI))
+    p_s_dist, p_s_exclude_dist = p_s(s_I, z_dim, gen, clas, masks, z_prior, p_s_zI=s_distr, z_notI=z_notI)
+    return tf.reduce_mean(logp_siz - tf.log(p_s_dist)), tf.reduce_mean(logp_siz - tf.log(p_s_exclude_dist))
+    # result = tf.reduce_mean(logp_siz - logp_si)
+    # return result, result
 
 def mi_difference(z_dim, gen, clas, masks, batch_size, k=100, draw_from_joint=False
     , z_prior = datasets.label_randn):
