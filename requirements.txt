@@ -5,6 +5,6 @@ disentanglement_lib==1.2
 gin_config==0.2.1
 matplotlib
 scipy
-tensorflow==1.15
+tensorflow==2.5.3
 numpy==1.17.2
 gin==0.1.006
