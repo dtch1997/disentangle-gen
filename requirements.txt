@@ -6,5 +6,5 @@ gin_config==0.2.1
 matplotlib
 scipy
 tensorflow==1.15
-numpy==1.17.2
+numpy==1.22.0
 gin==0.1.006
